@@ -1,0 +1,1 @@
+msbuild orderMaster.dproj /target:Build /p:config=Release

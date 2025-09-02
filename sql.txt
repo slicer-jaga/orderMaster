@@ -1,0 +1,41 @@
+WITH ranked AS (
+    SELECT 
+        t1.name,
+        t2.marks,
+        CARDINALITY(STRING_TO_ARRAY(t2.marks, ',')) AS cnt,
+        ROW_NUMBER() OVER (
+            PARTITION BY t1.name
+            ORDER BY CARDINALITY(STRING_TO_ARRAY(t2.marks, ',')) DESC
+        ) AS rn
+    FROM orders t1
+    JOIN orders t2 
+        ON t1.category = t2.category
+    WHERE t1.name ILIKE '%простуд%'
+)
+SELECT name, marks
+FROM ranked
+WHERE rn = 1;
+
+
+WITH exploded AS (
+    SELECT 
+        partner,
+        trim(both ' ' FROM unnest(string_to_array(marks, ','))) AS mark,
+        COUNT(*) OVER (PARTITION BY partner) AS total_rows
+    FROM orders
+    WHERE partner = 'Steam'
+)
+SELECT mark
+FROM exploded
+GROUP BY partner, mark, total_rows
+HAVING COUNT(*) = total_rows;
+
+SELECT 
+    partner,
+    CASE 
+        WHEN COUNT(DISTINCT category) = 1 
+        THEN MIN(category) 
+    END AS category
+FROM "orders"
+WHERE partner = 'Steam'
+GROUP BY partner;

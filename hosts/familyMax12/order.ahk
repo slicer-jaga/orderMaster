@@ -12,6 +12,8 @@ WinWaitActive(winTitle)
 ; 6 - Комментарий
 ; 7 - Метки
 
+sleep(1000)
+
 autoCommit := A_Args[2]
 
 params := StrSplit(A_Args[1], ";")
@@ -59,6 +61,9 @@ if (autoCommit = "-1") {
   ControlChooseIndex(1, "TOXPComboBox11", winTitle)
 }
 
+sleep(1000)
+
+SetControlDelay -1
 if (insMode = "more") {   
   ; Еще
   ControlClick("TsButton1", winTitle)
@@ -68,4 +73,4 @@ if (insMode = "more") {
 }
 
 ; Таймаут для приложения
-sleep(500)
+sleep(1000)

@@ -11,7 +11,8 @@ uses
   OrderFamily12MaxRepository in 'OrderFamily12MaxRepository.pas' {Family12MaxRepository: TDataModule},
   ParserThread in 'ParserThread.pas',
   OrderUtils in 'OrderUtils.pas',
-  ProgressForm in 'ProgressForm.pas' {frmProgress};
+  ProgressForm in 'ProgressForm.pas' {frmProgress},
+  OrderProcessor in 'OrderProcessor.pas';
 
 {$R *.res}
 

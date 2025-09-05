@@ -20,20 +20,21 @@ type
   var
     FFilename: string;
 
-    function GetItems(const AItems: TOrderItems; const AMode: TOrderCommitMode)
-      : TOrderItems;
+    function GetItems(const AItems: TOrderItems; const AInfo: TOrderInfo;
+      const AMode: TOrderCommitMode): TOrderItems;
   public
     constructor Create;
 
-    function Commit(const AItems: TOrderItems; const AMode: TOrderCommitMode;
-      const AAutoCommit: Boolean; out AReason: string): Boolean;
+    function Commit(const AItems: TOrderItems; const AInfo: TOrderInfo;
+      const AMode: TOrderCommitMode; const AAutoCommit: Boolean;
+      out AReason: string): Boolean;
     function IsSupport: Boolean;
     function GetOnTerminate: TNotifyEvent;
   end;
 
   TOrderFamily12MaxCommit = class(TOrderAHKCommit)
   protected const
-    C_Filename = 'familyMax12\order.ahk';
+    C_Filename = 'family12Max\order.ahk';
   public
     constructor Create;
   end;
@@ -47,8 +48,8 @@ uses
 { TOrderAHKCommit }
 
 function TOrderAHKCommit.Commit(const AItems: TOrderItems;
-  const AMode: TOrderCommitMode; const AAutoCommit: Boolean;
-  out AReason: string): Boolean;
+  const AInfo: TOrderInfo; const AMode: TOrderCommitMode;
+  const AAutoCommit: Boolean; out AReason: string): Boolean;
 var
   lInfo: TShellExecuteInfo;
   lExitCode: Cardinal;
@@ -66,7 +67,7 @@ begin
   lInfo.fMask := SEE_MASK_NOCLOSEPROCESS;
   lInfo.nShow := SW_HIDE;
 
-  lItems := GetItems(AItems, AMode);
+  lItems := GetItems(AItems, AInfo, AMode);
 
   for i := 0 to High(lItems) do
   begin
@@ -109,7 +110,7 @@ begin
 end;
 
 function TOrderAHKCommit.GetItems(const AItems: TOrderItems;
-  const AMode: TOrderCommitMode): TOrderItems;
+  const AInfo: TOrderInfo; const AMode: TOrderCommitMode): TOrderItems;
 var
   i: Integer;
 begin
@@ -127,6 +128,9 @@ begin
           Result[0][ovCaption] := Result[0][ovCaption] + AItems[i][ovCaption] +
             ' ' + AItems[i][ovSum];
         end;
+
+        if AInfo.Sum <> 0 then
+          Result[0][ovSum] := CurrToStr(AInfo.Sum);
       end;
   end;
 end;

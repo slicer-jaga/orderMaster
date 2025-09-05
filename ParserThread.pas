@@ -12,7 +12,7 @@ type
     FCR: TCriticalSection;
     FEV: TEvent;
     FStrings: TArray<string>;
-    FDefs, FDefIDs: TArray<TOrderItem>;
+    FInfos: TArray<TOrderInfo>;
     FParser: IOrderParser;
     FRegs: TStrings;
     FComposer: IOrderComposer;
@@ -26,7 +26,8 @@ type
       const AComposer: IOrderComposer; const AOnUpdate: TNotifyEvent);
     destructor Destroy; override;
 
-    procedure AddText(const AText: string; const ADef, ADefID: TOrderItem; const ARegs: TStrings);
+    procedure AddText(const AText: string; const AInfo: TOrderInfo;
+      const ARegs: TStrings);
   end;
 
 implementation
@@ -36,13 +37,12 @@ uses
 
 { TParserThread }
 
-procedure TParserThread.AddText(const AText: string;
-  const ADef, ADefID: TOrderItem; const ARegs: TStrings);
+procedure TParserThread.AddText(const AText: string; const AInfo: TOrderInfo;
+  const ARegs: TStrings);
 begin
   FCR.Enter;
   FStrings := FStrings + [AText];
-  FDefs := FDefs + [ADef];
-  FDefIDs := FDefIDs + [ADefID];
+  FInfos := FInfos + [AInfo];
   FRegs := ARegs;
 
   if Length(FStrings) = 1 then
@@ -78,10 +78,10 @@ begin
   while not Terminated do
   begin
     if FEV.WaitFor(100) = wrSignaled then
-    try
-      ParsingProcess;
-    except
-    end;
+      try
+        ParsingProcess;
+      except
+      end;
   end;
 end;
 
@@ -89,16 +89,14 @@ procedure TParserThread.ParsingProcess;
 var
   lItems: TOrderItems;
   lText: string;
-  lDef, lDefID: TOrderItem;
+  lInfo: TOrderInfo;
   lRestart: Boolean;
 begin
   FCR.Enter;
   lText := FStrings[High(FStrings)];
-  lDef := FDefs[High(FDefs)];
-  lDefID := FDefIDs[High(FDefIDs)];
+  lInfo := FInfos[High(FInfos)];
   FStrings := nil;
-  FDefs := nil;
-  FDefIDs := nil;
+  FInfos := nil;
   FCR.Leave;
 
   if Assigned(FRegs) then
@@ -111,7 +109,7 @@ begin
   if Length(lItems) = 0 then
     Exit;
 
-  FComposer.Compose(lItems, lDef, lDefID);
+  FComposer.Compose(lItems, lInfo);
 
   FCR.Enter;
   lRestart := Length(FStrings) > 0;

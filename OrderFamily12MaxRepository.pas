@@ -23,6 +23,7 @@ type
     FDPhysFBDriverLink: TFDPhysFBDriverLink;
     slCategoryCount: TFDQuery;
     dlgDB: TOpenDialog;
+    slSuggestTags: TFDQuery;
   private
     FDBLastWrite: TDateTime;
     FSrcFilename, FDstFilename: string;
@@ -49,6 +50,9 @@ type
 
     function SearchByName(const AName: string): TOrderItem;
     function SearchByPartner(const AName: string): TOrderItem;
+
+    function SuggestTags(const AName, APartnerID, ACategoryID: string)
+      : TArray<string>;
   end;
 
 var
@@ -117,7 +121,6 @@ begin
     lIni.Free;
   end;
 {$ENDIF}
-
   // Ќа вс€кий случай, работаем с копией базы
   FDstFilename := TPath.GetDirectoryName(FSrcFilename) + PathDelim + '~' +
     TPath.GetFileName(FSrcFilename);
@@ -270,7 +273,7 @@ begin
   for lQuery in lList do
   begin
     lTabIdx := _getIdx(lQuery.SQL, ',t2.cat0_name');
-    lJoinIdx :=_getIdx(lQuery.SQL, 'JOIN cat0 t2 ON');
+    lJoinIdx := _getIdx(lQuery.SQL, 'JOIN cat0 t2 ON');
     Assert((lTabIdx <> -1) and (lJoinIdx <> -1), 'InsertCategoryToSQL');
 
     for i := 2 to FCatCount do
@@ -278,7 +281,9 @@ begin
       lQuery.SQL.Insert(lTabIdx + 1, Format(',t%d.cat0_name', [i + 1]));
       Inc(lTabIdx);
       Inc(lJoinIdx);
-      lQuery.SQL.Insert(lJoinIdx + 1, Format('left JOIN cat0 t%d ON c.cat_id%d = t%d.cat0_id ', [i + 1, i - 1, i + 1]));
+      lQuery.SQL.Insert(lJoinIdx + 1,
+        Format('left JOIN cat0 t%d ON c.cat_id%d = t%d.cat0_id ',
+        [i + 1, i - 1, i + 1]));
       Inc(lJoinIdx);
     end;
   end;
@@ -424,6 +429,37 @@ begin
 
   if lCatSearched and (lCat <> '') then
     Result[ovCategory] := lCat;
+end;
+
+function TFamily12MaxRepository.SuggestTags(const AName, APartnerID,
+  ACategoryID: string): TArray<string>;
+const
+  C_EmptyQuery = '-999999';
+begin
+  Result := nil;
+  CheckRepo;
+
+  if AName <> '' then
+    slSuggestTags.ParamByName('search').Value := AName
+  else
+    slSuggestTags.ParamByName('search').Value := C_EmptyQuery;
+  if APartnerID <> '' then
+    slSuggestTags.ParamByName('partner').Value := APartnerID
+  else
+    slSuggestTags.ParamByName('partner').Value := C_EmptyQuery;
+  if ACategoryID <> '' then
+    slSuggestTags.ParamByName('category').Value := ACategoryID
+  else
+    slSuggestTags.ParamByName('category').Value := C_EmptyQuery;
+
+  slSuggestTags.Open;
+  slSuggestTags.First;
+  while not slSuggestTags.Eof do
+  begin
+    Result := Result + [slSuggestTags.Fields[0].Text];
+    slSuggestTags.Next;
+  end;
+  slSuggestTags.Close;
 end;
 
 end.

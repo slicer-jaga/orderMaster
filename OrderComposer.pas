@@ -15,8 +15,7 @@ type
   public
     constructor Create(const ARepository: IOrderRepository);
 
-    procedure Compose(const AItems: TOrderItems;
-      const ADef, ADefID: TOrderItem);
+    procedure Compose(const AItems: TOrderItems; const AInfo: TOrderInfo);
   end;
 
 implementation
@@ -27,22 +26,21 @@ uses
 { TOrderComposer }
 
 procedure TOrderComposer.Compose(const AItems: TOrderItems;
-  const ADef, ADefID: TOrderItem);
+  const AInfo: TOrderInfo);
 var
   i: Integer;
   lVal: TOrderValue;
-  lPrice, lCount: Currency;
 begin
   for i := Low(AItems) to High(AItems) do
   begin
     for lVal := Low(TOrderValue) to High(TOrderValue) do
-      if (AItems[i][lVal] = '') and (ADef[lVal] <> '') then
-        AItems[i][lVal] := ADef[lVal];
+      if (AItems[i][lVal] = '') and (AInfo.Def[lVal] <> '') then
+        AItems[i][lVal] := AInfo.Def[lVal];
 
     if (AItems[i][ovCategory] = '') or (AItems[i][ovTags] = '') then
     begin
       FByName := FRepo.SearchByName(AItems[i][ovCaption]);
-      FByPartner := FRepo.SearchByPartner(ADefID[ovPartner]);
+      FByPartner := FRepo.SearchByPartner(AInfo.DefID[ovPartner]);
 
       if AItems[i][ovCategory] = '' then
         AItems[i][ovCategory] := TryGetCategory(AItems[i]);
@@ -53,10 +51,6 @@ begin
       if (AItems[i][ovPartner] = '') and (FByName[ovPartner] <> '') then
         AItems[i][ovPartner] := FByName[ovPartner]
     end;
-
-    if (AItems[i][ovSum] = '') and TryStrToCurr(AItems[i][ovPrice], lPrice) and
-      TryStrToCurr(AItems[i][ovCount], lCount) then
-      AItems[i][ovSum] := CurrToStr(lPrice * lCount);
 
     if (AItems[i][ovCount] <> '') and (AItems[i][ovCount] <> '1') then
       AItems[i][ovCaption] := AItems[i][ovCaption] + ' x' + AItems[i][ovCount];

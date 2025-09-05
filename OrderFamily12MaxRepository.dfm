@@ -115,4 +115,52 @@ object Family12MaxRepository: TFamily12MaxRepository
     Left = 552
     Top = 88
   end
+  object slSuggestTags: TFDQuery
+    Connection = Testfamily12maxConnection
+    SQL.Strings = (
+      'SELECT '
+      '    r.re_tag as tags'
+      'FROM reestr r'
+      ''
+      'WHERE r.re_koment CONTAINING :search'
+      ''
+      'union'
+      ''
+      'SELECT '
+      '    r.re_tag as tags'
+      'FROM reestr r'
+      ''
+      'WHERE r.re_paye_id = :partner'
+      ''
+      'union'
+      ''
+      'SELECT'
+      '    r.re_tag as tags'
+      'FROM reestr r'
+      ''
+      'WHERE r.re_cat_id = :category;    '
+      ''
+      '')
+    Left = 288
+    Top = 248
+    ParamData = <
+      item
+        Name = 'SEARCH'
+        DataType = ftString
+        ParamType = ptInput
+        Value = #1048#1075#1088#1072' 1'
+      end
+      item
+        Name = 'PARTNER'
+        DataType = ftString
+        ParamType = ptInput
+        Value = '4'
+      end
+      item
+        Name = 'CATEGORY'
+        DataType = ftString
+        ParamType = ptInput
+        Value = '21'
+      end>
+  end
 end

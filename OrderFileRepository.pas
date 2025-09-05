@@ -12,12 +12,15 @@ type
     FItems: array [TOrderValue] of TOrderDictionaryItems;
   protected const
     C_Names: array [TOrderValue] of string = ('', 'account.txt', 'partner.txt',
-      '', 'category.txt', '', '', 'tags.txt', '');
+      '', 'category.txt', '', '', 'tags.txt', '', '');
   public
     constructor Create(const ADirectory: string);
     function GetItems(const ADictionary: TOrderValue): TOrderDictionaryItems;
     function SearchByName(const AName: string): TOrderItem;
     function SearchByPartner(const AName: string): TOrderItem;
+    function SuggestTags(const AName: string; const APartnerID: string;
+      const ACategoryID: string): System.TArray<System.string>;
+
   end;
 
 implementation
@@ -67,6 +70,12 @@ end;
 function TOrderFileRepository.SearchByPartner(const AName: string): TOrderItem;
 begin
   FillChar(Result, SizeOf(Result), 0);
+end;
+
+function TOrderFileRepository.SuggestTags(const AName, APartnerID,
+  ACategoryID: string): System.TArray<System.string>;
+begin
+  Result := nil;
 end;
 
 end.

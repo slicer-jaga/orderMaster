@@ -13,7 +13,7 @@ uses
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Grids,
   AdvObj, BaseGrid, AdvGrid, Vcl.ExtCtrls, System.Actions, Vcl.ActnList,
   FormSize, System.ImageList, Vcl.ImgList, Vcl.ComCtrls, Vcl.ToolWin,
-  Vcl.WinXCtrls, Vcl.Menus, AdvGridActns, AdvUtil;
+  Vcl.WinXCtrls, Vcl.Menus, AdvGridActns, AdvUtil, Vcl.StdActns;
 
 type
   TfrmMain = class(TForm)
@@ -52,6 +52,14 @@ type
     sgOrder: TAdvStringGrid;
     lblList: TLabel;
     chkAutoInput: TCheckBox;
+    edtSum: TEdit;
+    edtSale: TEdit;
+    lblSum: TLabel;
+    lblSale: TLabel;
+    AdvGridUndoRedo: TAdvGridUndoRedo;
+    N1: TMenuItem;
+    miUndo: TMenuItem;
+    miRedo: TMenuItem;
     procedure actParseExecute(Sender: TObject);
     procedure mmoParserChange(Sender: TObject);
     procedure ChangeDefault(Sender: TObject);
@@ -69,6 +77,9 @@ type
       var AEditor: TEditorType);
     procedure sgOrderKeyDown(Sender: TObject; var Key: Word;
       Shift: TShiftState);
+    procedure sgOrderSetEditText(Sender: TObject; ACol, ARow: Integer;
+      const Value: string);
+    procedure edtSaleChange(Sender: TObject);
   private
     FRepo: IOrderRepository;
     FParser: IOrderParser;
@@ -79,6 +90,8 @@ type
 
     FDef: TOrderItem;
     FDefID: TOrderItem;
+    FInfo: TOrderInfo;
+    FDefControls: array [TOrderValue] of TComboBox;
 
     FModified: Boolean;
     FNeedUpdateRegs: Boolean;
@@ -87,10 +100,15 @@ type
     procedure LoadOptions;
     procedure SaveOptions;
 
+    function GetInfo: TOrderInfo;
     function GetItems: TOrderItems;
+    function GetItem(const ARow: Integer): TOrderItem;
+    function GetDefaultID(const ACol: TOrderValue; const ARow: Integer): string;
 
     procedure UpdateControls(Sender: TObject);
     procedure DoAfterParse(Sender: TObject);
+    procedure AddToRow(const ARow: Integer; const AItem: TOrderItem);
+    procedure UpdateSum;
 
     procedure InitOrder;
     procedure InitDefault(const ACombo: TComboBox; const AValue: TOrderValue);
@@ -116,13 +134,14 @@ uses
   OrderFileRepository,
   OrderFamily12MaxRepository,
   OrderAHKCommit,
+  OrderProcessor,
   OrderUtils;
 
 const
   C_OrderCaptions: array [TOrderValue] of string = ('№', 'Счет', 'Контрагент',
-    'Название', 'Категория', 'Цена', 'Количество', 'Метки', 'Сумма');
+    'Название', 'Категория', 'Цена', 'Количество', 'Метки', 'Сумма', 'Скидка');
   C_OrderWidth: array [TOrderValue] of Integer = (20, 128, 128, 610, 128, 80,
-    80, 480, 80);
+    80, 400, 80, 80);
 
   { TfrmMain }
 
@@ -153,6 +172,15 @@ begin
   Parse;
 end;
 
+procedure TfrmMain.AddToRow(const ARow: Integer; const AItem: TOrderItem);
+var
+  lCol: TOrderValue;
+begin
+  for lCol := ovAccount to High(TOrderValue) do
+    if sgOrder.Cells[Integer(lCol), ARow] <> AItem[lCol] then
+      sgOrder.Cells[Integer(lCol), ARow] := AItem[lCol];
+end;
+
 procedure TfrmMain.ChangeDefault(Sender: TObject);
 var
   j: Integer;
@@ -173,7 +201,8 @@ begin
 
   for j := 1 to sgOrder.RowCount - 1 do
     if sgOrder.Cells[TComponent(Sender).Tag, j] = '' then
-      sgOrder.Cells[TComponent(Sender).Tag, j] := FDef[TOrderValue(TComponent(Sender).Tag)];
+      sgOrder.Cells[TComponent(Sender).Tag, j] :=
+        FDef[TOrderValue(TComponent(Sender).Tag)];
 end;
 
 procedure TfrmMain.Commit(const AMode: TOrderCommitMode);
@@ -192,7 +221,8 @@ begin
         end);
 
       lItems := GetItems;
-      lRes := FCommit.Commit(lItems, AMode, chkAutoInput.Checked, lReason);
+      lRes := FCommit.Commit(lItems, GetInfo, AMode,
+        chkAutoInput.Checked, lReason);
 
       Self.BeginInvoke(
         procedure
@@ -223,13 +253,14 @@ begin
 
 {$IFDEF DEBUG}
   // FRepo := TOrderFileRepository.Create('..\..\hosts\test');
-  FRepo := TFamily12MaxRepository.Create(Self);
-  FCommit := TOrderAHKCommit.Create;
+  // FRepo := TFamily12MaxRepository.Create(Self);
+  // FCommit := TOrderAHKCommit.Create;
 {$ELSE}
+{$ENDIF}
   FRepo := TFamily12MaxRepository.Create(Self);
   // FRepo := TOrderFileRepository.Create('familyMax12');
   FCommit := TOrderFamily12MaxCommit.Create;
-{$ENDIF}
+
   FParser := TOrderParser.Create;
   FComposer := TOrderComposer.Create(FRepo);
 
@@ -247,7 +278,6 @@ end;
 procedure TfrmMain.DoAfterParse(Sender: TObject);
 var
   i: Integer;
-  lCol: TOrderValue;
   lItems: TOrderItems;
 begin
   lItems := TOrderItems(Sender);
@@ -255,12 +285,9 @@ begin
   sgOrder.RowCount := Length(lItems) + 1;
 
   for i := 0 to High(lItems) do
-  begin
-    for lCol := ovAccount to High(TOrderValue) do
-      sgOrder.Cells[Integer(lCol), i + 1] := lItems[i][lCol];
-    sgOrder.Cells[Integer(TOrderValue.ovNone), i + 1] := (i + 1).ToString;
-  end;
+    AddToRow(i + 1, lItems[i]);
 
+  UpdateSum;
   FModified := True;
   UpdateControls(nil);
 end;
@@ -268,6 +295,12 @@ end;
 procedure TfrmMain.DoUpdateControls(Sender: TObject);
 begin
   UpdateControls(Sender);
+end;
+
+procedure TfrmMain.edtSaleChange(Sender: TObject);
+begin
+  sgOrder.Invalidate;
+  UpdateSum;
 end;
 
 procedure TfrmMain.StartProgress(const AOnTerminate: TNotifyEvent);
@@ -298,19 +331,51 @@ begin
   FThread := nil;
 end;
 
+function TfrmMain.GetDefaultID(const ACol: TOrderValue;
+const ARow: Integer): string;
+var
+  lVal: string;
+  lIdx: Integer;
+begin
+  lVal := sgOrder.Cells[Integer(ACol), ARow];
+  if (lVal = '') or (lVal = FDef[ACol]) then
+    Result := FDefID[ACol]
+  else
+  begin
+    lIdx := FDefControls[ACol].Items.IndexOf(lVal);
+    if lIdx = -1 then
+      Result := ''
+    else
+      Result := NativeInt(FDefControls[ACol].Items.Objects[lIdx]).ToString;
+  end;
+end;
+
+function TfrmMain.GetInfo: TOrderInfo;
+begin
+  Result := FInfo;
+  Result.Def := FDef;
+  Result.DefID := FDefID;
+end;
+
+function TfrmMain.GetItem(const ARow: Integer): TOrderItem;
+var
+  lCol: TOrderValue;
+begin
+  for lCol := Low(TOrderValue) to High(TOrderValue) do
+  begin
+    Result[lCol] := sgOrder.Cells[Integer(lCol), ARow];
+    if Result[lCol] = '' then
+      Result[lCol] := FDef[lCol];
+  end;
+end;
+
 function TfrmMain.GetItems: TOrderItems;
 var
   i: Integer;
-  lCol: TOrderValue;
 begin
   SetLength(Result, sgOrder.RowCount - 1);
   for i := 1 to sgOrder.RowCount - 1 do
-    for lCol := Low(TOrderValue) to High(TOrderValue) do
-    begin
-      Result[i - 1][lCol] := sgOrder.Cells[Integer(lCol), i];
-      if Result[i - 1][lCol] = '' then
-        Result[i - 1][lCol] := FDef[lCol];
-    end;
+    Result[i - 1] := GetItem(i);
 end;
 
 procedure TfrmMain.InitDefault(const ACombo: TComboBox;
@@ -319,6 +384,7 @@ var
   lItems: TOrderDictionaryItems;
   lItem: TOrderDictionaryItem;
 begin
+  FDefControls[AValue] := ACombo;
   ACombo.Tag := NativeInt(AValue);
   lItems := FRepo.GetItems(AValue);
   ACombo.Items.BeginUpdate;
@@ -465,19 +531,47 @@ begin
 
   lText := mmoParser.Lines.Text;
 
-  FThread.AddText(lText, FDef, FDefID, lRegs);
+  FThread.AddText(lText, GetInfo, lRegs);
 end;
 
 procedure TfrmMain.sgOrderEditingDone(Sender: TObject);
 begin
+  case TOrderValue(sgOrder.Col) of
+    ovPrice, ovCount, ovSum, ovSale:
+      begin
+        UpdateSum;
+        sgOrder.Invalidate;
+      end;
+  end;
+
   UpdateControls(nil);
 end;
 
 procedure TfrmMain.sgOrderGetDisplText(Sender: TObject; ACol, ARow: Integer;
 var Value: string);
 begin
-  if (ARow > 0) and (TOrderValue(ACol) = ovNone) then
-    Value := ARow.ToString;
+  case TOrderValue(ACol) of
+    ovNone:
+      if ARow > 0 then
+        Value := ARow.ToString;
+    ovCount:
+      if Value = '' then
+        Value := '1';
+    ovSale:
+      if Value = '' then
+      begin
+        if edtSale.Text <> '' then
+          Value := edtSale.Text
+        else
+          Value := edtSale.TextHint;
+      end;
+    ovSum:
+      if Value = '' then
+        Value := CurrToStr(TOrderProcessor.CalSummary
+          (StrToCurrDef(sgOrder.Cells[Integer(ovPrice), ARow], 0),
+          StrToCurrDef(sgOrder.Cells[Integer(ovCount), ARow], 0),
+          StrToCurrDef(sgOrder.Cells[Integer(ovSale), ARow], 0)));
+  end;
 end;
 
 procedure TfrmMain.sgOrderGetEditorType(Sender: TObject; ACol, ARow: Integer;
@@ -485,6 +579,8 @@ var AEditor: TEditorType);
 var
   lItem: TOrderDictionaryItem;
   lItems: TOrderDictionaryItems;
+  lTag: string;
+  lTags: TArray<string>;
 begin
   case TOrderValue(ACol) of
     ovAccount, ovPartner, ovCategory:
@@ -499,12 +595,28 @@ begin
         for lItem in lItems do
           sgOrder.AddComboString(lItem[odvName]);
       end;
+    ovTags:
+      begin
+        AEditor := edComboEdit;
+
+        sgOrder.ClearComboString;
+        sgOrder.Combobox.DropDownCount := cbxAccount.DropDownCount;
+        sgOrder.Combobox.DropWidth := cbxAccount.Width;
+
+        lTags := FRepo.SuggestTags(sgOrder.Cells[Integer(ovCaption), ARow],
+          GetDefaultID(ovPartner, ARow), GetDefaultID(ovCategory, ARow));
+        for lTag in lTags do
+          sgOrder.AddComboString(lTag);
+      end;
   end;
 end;
 
 procedure TfrmMain.sgOrderKeyDown(Sender: TObject; var Key: Word;
 Shift: TShiftState);
 begin
+  if sgOrder.EditorMode then
+    Exit;
+
   if Shift = [ssCtrl] then
   begin
     if Key = Ord('C') then
@@ -526,10 +638,44 @@ begin
   end;
 end;
 
+procedure TfrmMain.sgOrderSetEditText(Sender: TObject; ACol, ARow: Integer;
+const Value: string);
+begin
+  //
+end;
+
 procedure TfrmMain.UpdateControls(Sender: TObject);
 begin
   actCommit.Enabled := FCommit.IsSupport;
+  actCommitOneRecord.Enabled := actCommit.Enabled;
   actListDel.Enabled := sgOrder.Focused and (sgOrder.RowCount > 2);
+end;
+
+procedure TfrmMain.UpdateSum;
+var
+  lSum, lVal: Currency;
+  i: Integer;
+begin
+  if edtSum.Text = '' then
+  begin
+    lSum := 0;
+    for i := 1 to sgOrder.RowCount - 1 do
+    begin
+      lVal := TOrderProcessor.CalSummary
+        (StrToCurrDef(sgOrder.Cells[Integer(ovPrice), i], 0),
+        StrToCurrDef(sgOrder.Cells[Integer(ovCount), i], 0),
+        StrToCurrDef(sgOrder.Cells[Integer(ovSale), i], 0));
+      if lVal = 0 then
+        Continue;
+      lSum := lSum + lVal;
+    end;
+
+    edtSum.TextHint := CurrToStr(lSum);
+  end
+  else
+    lSum := StrToCurr(edtSum.Text);
+
+  FInfo.Sum := lSum;
 end;
 
 end.

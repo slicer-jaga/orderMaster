@@ -2,7 +2,7 @@
 Программа для парсинга чеков в программу "Family 12 Max"
 
 ## Скачать
-[orderM<aster v0.0.1](https://drive.google.com/file/d/1O7IXa-GjUQTorNqw1rN7dWQoOxkqygyK/view?usp=sharing)
+[orderM<aster v0.0.2](https://drive.google.com/file/d/1gqhZ8Qywr2CnxaL7M5BonvKi_meYw5D1/view?usp=sharing)
 
 ## Использование
 * Заполнить "Список платежей" вставкой текста чека в поле "Чек" или вручную
